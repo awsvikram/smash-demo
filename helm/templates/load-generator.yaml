@@ -1,0 +1,59 @@
+{{- if .Values.loadGenerator.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-load-gen
+  labels:
+    app: {{ .Release.Name }}-load-gen
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-load-gen
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-load-gen
+    spec:
+      containers:
+        - name: load-gen
+          image: python:3.12-slim
+          command:
+            - /bin/sh
+            - -c
+            - |
+              pip install -q requests && python3 - <<'EOF'
+              import requests, time, uuid, random, os
+
+              target = os.getenv("TARGET_URL", "http://sample-app")
+              rps = float(os.getenv("RPS", "5"))
+              delay = 1.0 / rps
+              paths = ["/", "/process?type=order", "/process?type=event", "/process?type=alert"]
+
+              print(f"Starting load gen -> {target} at {rps} req/s")
+              while True:
+                  path = random.choice(paths)
+                  headers = {
+                      "X-Trace-Id": str(uuid.uuid4()),
+                      "X-Message-Id": str(uuid.uuid4()),
+                  }
+                  try:
+                      r = requests.get(f"{target}{path}", headers=headers, timeout=5)
+                      print(f"{r.status_code} {path}")
+                  except Exception as e:
+                      print(f"ERROR: {e}")
+                  time.sleep(delay)
+              EOF
+          env:
+            - name: TARGET_URL
+              value: {{ .Values.loadGenerator.targetUrl | quote }}
+            - name: RPS
+              value: {{ .Values.loadGenerator.requestsPerSecond | quote }}
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
+{{- end }}
