@@ -33,3 +33,4 @@ loadGenerator:
   enabled: true
   targetUrl: "http://sample-app"
   requestsPerSecond: 5
+  escalationIntervalSeconds: 60  # seconds per phase before alert severity ramps up
